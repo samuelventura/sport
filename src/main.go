@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -94,9 +95,36 @@ func main() {
 				size := int(binary.BigEndian.Uint16(packet[2:4]))
 				go func() {
 					for {
+						runtime.GC()
 						read_n(port, writer, size, 0)
 					}
 				}()
+			case 'c':
+				c := packet[2]
+				go func() {
+					for {
+						runtime.GC()
+						read_c(port, writer, c)
+					}
+				}()
+			}
+		}
+	}
+}
+
+func read_c(port Port, writer *bufio.Writer, c byte) {
+	var buff bytes.Buffer
+	buff.WriteByte('r')
+	port.Packet(1, 0)
+	data := make([]byte, 1)
+	for {
+		n := port.Read(data)
+		if n == 1 {
+			cc := data[0]
+			buff.WriteByte(cc)
+			if c == cc {
+				send(writer, buff.Bytes())
+				return
 			}
 		}
 	}

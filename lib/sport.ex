@@ -76,7 +76,11 @@ defmodule Sport do
     end
   end
 
-  def packet(port, size) when is_word(size) and size > 0 do
+  def packetn(port, size) when is_word(size) do
     true = Port.command(port, ['p', 'n', div(size, 256), rem(size, 256)])
+  end
+
+  def packetc(port, delim) when is_byte(delim) do
+    true = Port.command(port, ['p', 'c', delim])
   end
 end
