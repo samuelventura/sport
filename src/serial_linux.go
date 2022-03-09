@@ -5,7 +5,7 @@ package main
 import "golang.org/x/sys/unix"
 
 var baudrateMap = map[int]uint32{
-	0:       unix.B9600, // Default to 9600
+	0:       unix.B9600,
 	50:      unix.B50,
 	75:      unix.B75,
 	110:     unix.B110,
@@ -39,7 +39,7 @@ var baudrateMap = map[int]uint32{
 }
 
 var databitsMap = map[int]uint32{
-	0: unix.CS8, // Default to 8 bits
+	0: unix.CS8,
 	5: unix.CS5,
 	6: unix.CS6,
 	7: unix.CS7,
@@ -50,6 +50,7 @@ const tcCMSPAR = unix.CMSPAR
 const tcIUCLC = unix.IUCLC
 const ioctlTcgetattr = unix.TCGETS
 const ioctlTcsetattr = unix.TCSETS
+const ioctlTcsetDrain = unix.TCSETSW
 const tcCRTSCTS uint32 = unix.CRTSCTS
 
 func toTermiosSpeedType(speed uint32) uint32 {

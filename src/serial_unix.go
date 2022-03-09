@@ -14,190 +14,158 @@ type portDto struct {
 	handle   int
 }
 
-func Open(portName string, mode *Mode) (port *portDto, err error) {
+func Open(portName string, mode *Mode) (port *portDto) {
 	h, err := unix.Open(portName,
 		unix.O_RDWR|unix.O_NOCTTY|unix.O_NDELAY,
 		0)
-	if err != nil {
-		return
-	}
+	fatalIfError(err)
 
 	port = &portDto{
 		handle: h,
 		name:   portName,
 	}
 
-	// prevent handle leaks
-	defer func() {
-		if err != nil {
-			port.Close()
-			port.handle = 0
-		}
-	}()
+	err = unix.SetNonblock(port.handle, false)
+	fatalIfError(err)
 
-	err = unix.SetNonblock(h, false)
-	if err != nil {
-		return
+	port.settings, err = unix.IoctlGetTermios(port.handle, ioctlTcgetattr)
+	fatalIfError(err)
+
+	// parity
+	switch mode.Parity {
+	case NoParity:
+		port.settings.Cflag &^= unix.PARENB
+		port.settings.Cflag &^= unix.PARODD
+		port.settings.Cflag &^= tcCMSPAR
+		port.settings.Iflag &^= unix.INPCK
+	case OddParity:
+		port.settings.Cflag |= unix.PARENB
+		port.settings.Cflag |= unix.PARODD
+		port.settings.Cflag &^= tcCMSPAR
+		port.settings.Iflag |= unix.INPCK
+	case EvenParity:
+		port.settings.Cflag |= unix.PARENB
+		port.settings.Cflag &^= unix.PARODD
+		port.settings.Cflag &^= tcCMSPAR
+		port.settings.Iflag |= unix.INPCK
+	default:
+		err := fmt.Errorf("invalid parity")
+		fatalIfError(err)
 	}
 
-	settings, err := getTermSettings(port)
-	if err != nil {
-		return
-	}
-	port.settings = settings
-
-	err = setTermSettingsBaudrate(mode.BaudRate, settings)
-	if err != nil {
-		return
-	}
-	err = setTermSettingsParity(mode.Parity, settings)
-	if err != nil {
-		return
-	}
-	err = setTermSettingsDataBits(mode.DataBits, settings)
-	if err != nil {
-		return
-	}
-	err = setTermSettingsStopBits(mode.StopBits, settings)
-	if err != nil {
-		return
-	}
-
-	// Set raw mode
-	// disable handshake
-	settings.Cflag &^= tcCRTSCTS
-
-	// Set local mode
-	settings.Cflag |= unix.CREAD
-	settings.Cflag |= unix.CLOCAL
-
-	// Set raw mode
-	settings.Lflag &^= unix.ICANON
-	settings.Lflag &^= unix.ECHO
-	settings.Lflag &^= unix.ECHOE
-	settings.Lflag &^= unix.ECHOK
-	settings.Lflag &^= unix.ECHONL
-	settings.Lflag &^= unix.ECHOCTL
-	settings.Lflag &^= unix.ECHOPRT
-	settings.Lflag &^= unix.ECHOKE
-	settings.Lflag &^= unix.ISIG
-	settings.Lflag &^= unix.IEXTEN
-
-	settings.Iflag &^= unix.IXON
-	settings.Iflag &^= unix.IXOFF
-	settings.Iflag &^= unix.IXANY
-	settings.Iflag &^= unix.INPCK
-	settings.Iflag &^= unix.IGNPAR
-	settings.Iflag &^= unix.PARMRK
-	settings.Iflag &^= unix.ISTRIP
-	settings.Iflag &^= unix.IGNBRK
-	settings.Iflag &^= unix.BRKINT
-	settings.Iflag &^= unix.INLCR
-	settings.Iflag &^= unix.IGNCR
-	settings.Iflag &^= unix.ICRNL
-	settings.Iflag &^= tcIUCLC
-
-	settings.Oflag &^= unix.OPOST
-
-	// Block reads until at least one char is available (no timeout)
-	settings.Cc[unix.VMIN] = 1
-	settings.Cc[unix.VTIME] = 0
-
-	err = setTermSettings(port, settings)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-func (port *portDto) Discard() (err error) {
-	err = unix.IoctlSetInt(port.handle, unix.TCFLSH, unix.TCIOFLUSH)
-	return
-}
-
-func (port *portDto) Close() (err error) {
-	err = unix.Close(port.handle)
-	return
-}
-
-func (port *portDto) Read(p []byte) (n int, err error) {
-	n, err = unix.Read(port.handle, p)
-	return
-}
-
-func (port *portDto) Write(p []byte) (n int, err error) {
-	n, err = unix.Write(port.handle, p)
-	return
-}
-
-func setTermSettingsBaudrate(speed int, settings *unix.Termios) (err error) {
-	baudrate, ok := baudrateMap[speed]
+	// baudrate
+	baudrate, ok := baudrateMap[mode.BaudRate]
 	if !ok {
-		err = fmt.Errorf("invalid speed %d", speed)
-		return
+		err := fmt.Errorf("invalid speed %d", mode.BaudRate)
+		fatalIfError(err)
 	}
 	for _, rate := range baudrateMap {
-		settings.Cflag &^= rate
+		port.settings.Cflag &^= rate
 	}
-	settings.Cflag |= baudrate
-	settings.Ispeed = toTermiosSpeedType(baudrate)
-	settings.Ospeed = toTermiosSpeedType(baudrate)
-	return nil
-}
+	port.settings.Cflag |= baudrate
+	port.settings.Ispeed = toTermiosSpeedType(baudrate)
+	port.settings.Ospeed = toTermiosSpeedType(baudrate)
 
-func setTermSettingsParity(parity Parity, settings *unix.Termios) (err error) {
-	switch parity {
-	case NoParity:
-		settings.Cflag &^= unix.PARENB
-		settings.Cflag &^= unix.PARODD
-		settings.Cflag &^= tcCMSPAR
-		settings.Iflag &^= unix.INPCK
-	case OddParity:
-		settings.Cflag |= unix.PARENB
-		settings.Cflag |= unix.PARODD
-		settings.Cflag &^= tcCMSPAR
-		settings.Iflag |= unix.INPCK
-	case EvenParity:
-		settings.Cflag |= unix.PARENB
-		settings.Cflag &^= unix.PARODD
-		settings.Cflag &^= tcCMSPAR
-		settings.Iflag |= unix.INPCK
-	default:
-		err = fmt.Errorf("invalid parity")
-	}
-	return
-}
-
-func setTermSettingsDataBits(bits int, settings *unix.Termios) (err error) {
-	databits, ok := databitsMap[bits]
+	// databits
+	databits, ok := databitsMap[mode.DataBits]
 	if !ok {
-		err = fmt.Errorf("invalid databits %d", bits)
-		return
+		err := fmt.Errorf("invalid databits %d", mode.DataBits)
+		fatalIfError(err)
 	}
-	settings.Cflag &^= unix.CSIZE
-	settings.Cflag |= databits
-	return nil
+	port.settings.Cflag &^= unix.CSIZE
+	port.settings.Cflag |= databits
+
+	// stopbits
+	switch mode.StopBits {
+	case OneStopBit:
+		port.settings.Cflag &^= unix.CSTOPB
+	case TwoStopBits:
+		port.settings.Cflag |= unix.CSTOPB
+	default:
+		err := fmt.Errorf("invalid stopbits %d", mode.StopBits)
+		fatalIfError(err)
+	}
+
+	// raw mode
+	port.settings.Cflag &^= tcCRTSCTS
+	port.settings.Cflag |= unix.CREAD
+	port.settings.Cflag |= unix.CLOCAL
+
+	port.settings.Lflag &^= unix.ICANON
+	port.settings.Lflag &^= unix.ECHO
+	port.settings.Lflag &^= unix.ECHOE
+	port.settings.Lflag &^= unix.ECHOK
+	port.settings.Lflag &^= unix.ECHONL
+	port.settings.Lflag &^= unix.ECHOCTL
+	port.settings.Lflag &^= unix.ECHOPRT
+	port.settings.Lflag &^= unix.ECHOKE
+	port.settings.Lflag &^= unix.ISIG
+	port.settings.Lflag &^= unix.IEXTEN
+
+	port.settings.Iflag &^= unix.IXON
+	port.settings.Iflag &^= unix.IXOFF
+	port.settings.Iflag &^= unix.IXANY
+	port.settings.Iflag &^= unix.INPCK
+	port.settings.Iflag &^= unix.IGNPAR
+	port.settings.Iflag &^= unix.PARMRK
+	port.settings.Iflag &^= unix.ISTRIP
+	port.settings.Iflag &^= unix.IGNBRK
+	port.settings.Iflag &^= unix.BRKINT
+	port.settings.Iflag &^= unix.INLCR
+	port.settings.Iflag &^= unix.IGNCR
+	port.settings.Iflag &^= unix.ICRNL
+	port.settings.Iflag &^= tcIUCLC
+
+	port.settings.Oflag &^= unix.OPOST
+	port.settings.Oflag &^= unix.ONLCR
+	port.settings.Oflag &^= unix.OCRNL
+
+	port.settings.Cc[unix.VMIN] = 1
+	port.settings.Cc[unix.VTIME] = 0
+
+	err = unix.IoctlSetTermios(port.handle, ioctlTcsetattr, port.settings)
+	fatalIfError(err)
+	return
 }
 
-func setTermSettingsStopBits(bits StopBits, settings *unix.Termios) (err error) {
-	switch bits {
-	case OneStopBit:
-		settings.Cflag &^= unix.CSTOPB
-	case OnePointFiveStopBits:
-		err = fmt.Errorf("invalid stopbits %d", bits)
-	case TwoStopBits:
-		settings.Cflag |= unix.CSTOPB
-	default:
-		err = fmt.Errorf("invalid stopbits %d", bits)
+func (port *portDto) Packet(vmin, vtime uint8) {
+	port.settings.Cc[unix.VMIN] = vmin
+	port.settings.Cc[unix.VTIME] = vtime
+	err := unix.IoctlSetTermios(port.handle, ioctlTcsetattr, port.settings)
+	fatalIfError(err)
+}
+
+func (port *portDto) Drain() {
+	err := unix.IoctlSetTermios(port.handle, ioctlTcsetDrain, port.settings)
+	fatalIfError(err)
+}
+
+func (port *portDto) Discard() {
+	err := unix.IoctlSetInt(port.handle, unix.TCFLSH, unix.TCIOFLUSH)
+	fatalIfError(err)
+}
+
+func (port *portDto) Close() {
+	err := unix.Close(port.handle)
+	fatalIfError(err)
+}
+
+func (port *portDto) Read(p []byte) (n int) {
+	n, err := unix.Read(port.handle, p)
+	fatalIfError(err)
+	if n < 0 {
+		err = fmt.Errorf("invalid read %d", n)
+		fatalIfError(err)
 	}
 	return
 }
 
-func getTermSettings(port *portDto) (*unix.Termios, error) {
-	return unix.IoctlGetTermios(port.handle, ioctlTcgetattr)
-}
-
-func setTermSettings(port *portDto, settings *unix.Termios) error {
-	return unix.IoctlSetTermios(port.handle, ioctlTcsetattr, settings)
+func (port *portDto) Write(p []byte) (n int) {
+	n, err := unix.Write(port.handle, p)
+	fatalIfError(err)
+	if n < 0 {
+		err = fmt.Errorf("invalid write %d", n)
+		fatalIfError(err)
+	}
+	return
 }
