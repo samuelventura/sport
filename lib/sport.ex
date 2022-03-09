@@ -69,4 +69,14 @@ defmodule Sport do
       {^port, {:data, <<"r", data::binary>>}} -> data
     end
   end
+
+  def receive(port) do
+    receive do
+      {^port, {:data, <<"r", data::binary>>}} -> data
+    end
+  end
+
+  def packet(port, size) when is_word(size) and size > 0 do
+    true = Port.command(port, ['p', 'n', div(size, 256), rem(size, 256)])
+  end
 end

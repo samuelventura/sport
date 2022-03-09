@@ -86,43 +86,37 @@ func main() {
 			if size == 0 {
 				size = port.Available()
 			}
-			data := make([]byte, size+1)
-			data[0] = 'r'
-			buff := data[1:]
-			read := 0 //single read gets ~64 bytes
-			for read < len(buff) {
-				vmin := 255
-				pend := len(buff) - read
-				if pend < 255 {
-					vmin = pend
-				}
-				port.Packet(uint8(vmin), vtime)
-				read += port.Read(buff[read:])
-			}
-			send(writer, data)
+			read_n(port, writer, size, vtime)
 		case 'p':
 			prof := packet[1]
 			switch prof {
 			case 'n':
-				vmin := packet[2]
-				go poll_n(port, writer, vmin)
+				size := int(binary.BigEndian.Uint16(packet[2:4]))
+				go func() {
+					for {
+						read_n(port, writer, size, 0)
+					}
+				}()
 			}
 		}
 	}
 }
 
-func poll_n(port Port, writer *bufio.Writer, vmin uint8) {
-	port.Packet(vmin, 0)
-	for {
-		data := make([]byte, vmin+1)
-		data[0] = 'r'
-		buff := data[1:]
-		read := 0 //single read gets ~64 bytes
-		for read < len(buff) {
-			read += port.Read(buff[read:])
+func read_n(port Port, writer *bufio.Writer, size int, vtime uint8) {
+	data := make([]byte, size+1)
+	data[0] = 'r'
+	buff := data[1:]
+	read := 0 //single read gets ~64 bytes
+	for read < len(buff) {
+		vmin := 255
+		pend := len(buff) - read
+		if pend < 255 {
+			vmin = pend
 		}
-		send(writer, data)
+		port.Packet(uint8(vmin), vtime)
+		read += port.Read(buff[read:])
 	}
+	send(writer, data)
 }
 
 func send(writer *bufio.Writer, packet []byte) {
