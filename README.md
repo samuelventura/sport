@@ -47,3 +47,4 @@ VMIN (and in general PC timers) is totally unappropiated and unreliable to imple
 ## Research
 
 - Impact of GOMAXPROCS
+- Impact of runtime.GC()
