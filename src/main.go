@@ -22,29 +22,43 @@ func main() {
 	mode := &Mode{BaudRate: bauds}
 	configMode(config, mode)
 	port := Open(path, mode)
-	reader := bufio.NewReader(os.Stdin)
+	queue := make(chan []byte)
+	go func() {
+		reader := bufio.NewReader(os.Stdin)
+		head := make([]byte, 2)
+		for {
+			runtime.GC()
+			n, err := reader.Read(head)
+			if err == nil && n != 2 {
+				err = fmt.Errorf("stdin read failed %d", n)
+			}
+			fatalIfError(err)
+			size := int(binary.BigEndian.Uint16(head))
+			packet := make([]byte, size)
+			n, err = reader.Read(packet)
+			if err == nil && n != size {
+				err = fmt.Errorf("stdin read failed %d", n)
+			}
+			fatalIfError(err)
+			queue <- packet
+		}
+	}()
 	writer := bufio.NewWriter(os.Stdout)
-	head := make([]byte, 2)
-	for {
-		runtime.GC()
-		n, err := reader.Read(head)
-		if err == nil && n != 2 {
-			err = fmt.Errorf("stdin read failed %d", n)
-		}
-		fatalIfError(err)
-		size := int(binary.BigEndian.Uint16(head))
-		packet := make([]byte, size)
-		n, err = reader.Read(packet)
-		if err == nil && n != size {
-			err = fmt.Errorf("stdin read failed %d", n)
-		}
-		fatalIfError(err)
+	for packet := range queue {
 		cmd := packet[0]
 		switch cmd {
 		case 'd':
+			sync := packet[1]
 			port.Drain()
+			if sync > 0 {
+				send(writer, packet)
+			}
 		case 'D':
+			sync := packet[1]
 			port.Discard()
+			if sync > 0 {
+				send(writer, packet)
+			}
 		case 'w':
 			data := packet[1:]
 			n := port.Write(data)
@@ -65,23 +79,35 @@ func main() {
 			vmin := packet[1]
 			vtime := packet[2] //tenths of a second
 			port.Packet(uint8(vmin), uint8(vtime))
-			data := make([]byte, vmin)
-			read := port.Read(data)
-			binary.BigEndian.PutUint16(head, uint16(read))
-			n, err = writer.Write(head)
-			if err == nil && n != 2 {
-				err = fmt.Errorf("stdout write failed %d", n)
+			data := make([]byte, vmin+1)
+			data[0] = 'r'
+			rdata := data[1:]
+			//log.Println("vmin", vmin, "vtime", vtime)
+			read := 0 //single read gets ~64 bytes
+			for read < len(rdata) {
+				read += port.Read(rdata[read:])
 			}
-			fatalIfError(err)
-			n, err = writer.Write(data[:read])
-			if err == nil && n != read {
-				err = fmt.Errorf("stdout write failed %d", read)
-			}
-			fatalIfError(err)
-			err = writer.Flush()
-			fatalIfError(err)
+			send(writer, data)
 		}
 	}
+}
+
+func send(writer *bufio.Writer, packet []byte) {
+	size := len(packet)
+	head := make([]byte, 2)
+	binary.BigEndian.PutUint16(head, uint16(size))
+	n, err := writer.Write(head)
+	if err == nil && n != 2 {
+		err = fmt.Errorf("stdout write failed %d", n)
+	}
+	fatalIfError(err)
+	n, err = writer.Write(packet[:size])
+	if err == nil && n != size {
+		err = fmt.Errorf("stdout write failed %d", size)
+	}
+	fatalIfError(err)
+	err = writer.Flush()
+	fatalIfError(err)
 }
 
 func getArg(index int) string {

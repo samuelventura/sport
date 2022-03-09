@@ -18,5 +18,6 @@ if [[ "$SOCAT_TTY" == "true" ]]; then
   export TTY0="/tmp/tty.socat0"
   export TTY1="/tmp/tty.socat1"
 
-  mix test "$@" --trace
+  #--trace sets timeout to :infinity
+  mix test --timeout 1000 "$@"
 fi

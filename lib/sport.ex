@@ -18,12 +18,32 @@ defmodule Sport do
     Port.close(port)
   end
 
-  def drain(port) do
-    Port.command(port, ['d'])
+  def drain(port, sync \\ true) do
+    case sync do
+      false ->
+        Port.command(port, ["d\x00"])
+
+      true ->
+        true = Port.command(port, ["d\x01"])
+
+        receive do
+          {^port, {:data, "d\x01"}} -> true
+        end
+    end
   end
 
-  def discard(port) do
-    Port.command(port, ['D'])
+  def discard(port, sync \\ true) do
+    case sync do
+      false ->
+        Port.command(port, ["D\x00"])
+
+      true ->
+        true = Port.command(port, ["D\x01"])
+
+        receive do
+          {^port, {:data, "D\x01"}} -> true
+        end
+    end
   end
 
   def write(port, data) do
@@ -32,10 +52,10 @@ defmodule Sport do
 
   # tenths of a second
   def read(port, vmin \\ 0, vtime \\ 0) when is_byte(vmin) and is_byte(vtime) do
-    Port.command(port, ['r', vmin, vtime])
+    true = Port.command(port, ['r', vmin, vtime])
 
     receive do
-      {^port, {:data, data}} -> data
+      {^port, {:data, <<"r", data::binary>>}} -> data
     end
   end
 end
