@@ -135,6 +135,12 @@ func (port *portDto) Packet(vmin, vtime uint8) {
 	fatalIfError(err)
 }
 
+func (port *portDto) Available() int {
+	n, err := unix.IoctlGetInt(port.handle, unix.TIOCINQ)
+	fatalIfError(err)
+	return n
+}
+
 func (port *portDto) Drain() {
 	err := unix.IoctlSetTermios(port.handle, ioctlTcsetDrain, port.settings)
 	fatalIfError(err)

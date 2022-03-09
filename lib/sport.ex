@@ -1,6 +1,7 @@
 defmodule Sport do
   @moduledoc false
   defguard is_byte(n) when is_integer(n) and n >= 0 and n <= 0xFF
+  defguard is_word(n) when is_integer(n) and n >= 0 and n <= 0xFFFF
 
   def open(device, speed, config) do
     exec =
@@ -61,8 +62,8 @@ defmodule Sport do
   end
 
   # tenths of a second
-  def read(port, vmin \\ 0, vtime \\ 0) when is_byte(vmin) and is_byte(vtime) do
-    true = Port.command(port, ['r', vmin, vtime])
+  def read(port, size \\ 0, vtime \\ 0) when is_word(size) and is_byte(vtime) do
+    true = Port.command(port, ['r', div(size, 256), rem(size, 256), vtime])
 
     receive do
       {^port, {:data, <<"r", data::binary>>}} -> data

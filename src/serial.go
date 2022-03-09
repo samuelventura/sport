@@ -4,6 +4,7 @@ type Port interface {
 	Read(p []byte) int
 	Write(p []byte) int
 	Packet(vmin, vtime uint8)
+	Available() int
 	Drain()
 	Discard()
 	Close()

@@ -1,6 +1,6 @@
 # Sport
 
-Serial port elixir port with a very focused async API.
+Serial elixir port with a very focused async API.
 
 ## Goals and Scope
 

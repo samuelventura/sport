@@ -24,6 +24,47 @@ defmodule SportTest do
     assert true == Sport.close(port1)
   end
 
+  test "size=0 test" do
+    all =
+      Enum.reduce(0..511, [], fn _i, list ->
+        [<<"0">> | list]
+      end)
+      |> Enum.reverse()
+      |> :erlang.iolist_to_binary()
+
+    port0 = Sport.open("/tmp/tty.socat0", 9600, "8N1")
+    port1 = Sport.open("/tmp/tty.socat1", 9600, "8N1")
+    assert true == Sport.discard(port0)
+    assert true == Sport.discard(port1)
+    assert true == Sport.write(port0, all)
+    assert true == Sport.drain(port0)
+    assert all == Sport.read(port1, 0, 0)
+    assert true == Sport.write(port1, all)
+    assert true == Sport.drain(port1)
+    assert all == Sport.read(port0, 0, 1)
+    assert true == Sport.close(port0)
+    assert true == Sport.close(port1)
+  end
+
+  test "read > 255 test" do
+    all =
+      Enum.reduce(0..511, [], fn _i, list ->
+        [<<"0">> | list]
+      end)
+      |> Enum.reverse()
+      |> :erlang.iolist_to_binary()
+
+    port0 = Sport.open("/tmp/tty.socat0", 9600, "8N1")
+    port1 = Sport.open("/tmp/tty.socat1", 9600, "8N1")
+    assert true == Sport.discard(port0)
+    assert true == Sport.discard(port1)
+    assert true == Sport.write(port0, all)
+    assert true == Sport.drain(port0)
+    assert all == Sport.read(port1, byte_size(all))
+    assert true == Sport.close(port0)
+    assert true == Sport.close(port1)
+  end
+
   test "raw test" do
     lo =
       Enum.reduce(0..127, [], fn i, list ->
