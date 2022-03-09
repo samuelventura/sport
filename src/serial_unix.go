@@ -1,4 +1,4 @@
-//go:build linux || darwin || freebsd || openbsd
+//go:build linux || darwin
 
 package main
 
@@ -63,8 +63,8 @@ func Open(portName string, mode *Mode) (port *portDto) {
 		port.settings.Cflag &^= rate
 	}
 	port.settings.Cflag |= baudrate
-	port.settings.Ispeed = toTermiosSpeedType(baudrate)
-	port.settings.Ospeed = toTermiosSpeedType(baudrate)
+	port.settings.Ispeed = baudrate
+	port.settings.Ospeed = baudrate
 
 	// databits
 	databits, ok := databitsMap[mode.DataBits]
@@ -132,22 +132,6 @@ func (port *portDto) Packet(vmin, vtime uint8) {
 	port.settings.Cc[unix.VMIN] = vmin
 	port.settings.Cc[unix.VTIME] = vtime
 	err := unix.IoctlSetTermios(port.handle, ioctlTcsetattr, port.settings)
-	fatalIfError(err)
-}
-
-func (port *portDto) Available() int {
-	n, err := unix.IoctlGetInt(port.handle, unix.TIOCINQ)
-	fatalIfError(err)
-	return n
-}
-
-func (port *portDto) Drain() {
-	err := unix.IoctlSetTermios(port.handle, ioctlTcsetDrain, port.settings)
-	fatalIfError(err)
-}
-
-func (port *portDto) Discard() {
-	err := unix.IoctlSetInt(port.handle, unix.TCFLSH, unix.TCIOFLUSH)
 	fatalIfError(err)
 }
 

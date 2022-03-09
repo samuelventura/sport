@@ -46,13 +46,28 @@ var databitsMap = map[int]uint32{
 	8: unix.CS8,
 }
 
-const tcCMSPAR = unix.CMSPAR
-const tcIUCLC = unix.IUCLC
 const ioctlTcgetattr = unix.TCGETS
 const ioctlTcsetattr = unix.TCSETS
 const ioctlTcsetDrain = unix.TCSETSW
+const ioctlTcflsh = unix.TCFLSH
+const ioctlTcavail = unix.TIOCINQ
+
+const tcCMSPAR = unix.CMSPAR
+const tcIUCLC = unix.IUCLC
 const tcCRTSCTS uint32 = unix.CRTSCTS
 
-func toTermiosSpeedType(speed uint32) uint32 {
-	return speed
+func (port *portDto) Available() int {
+	n, err := unix.IoctlGetInt(port.handle, ioctlTcavail)
+	fatalIfError(err)
+	return n
+}
+
+func (port *portDto) Drain() {
+	err := unix.IoctlSetTermios(port.handle, ioctlTcsetDrain, port.settings)
+	fatalIfError(err)
+}
+
+func (port *portDto) Discard() {
+	err := unix.IoctlSetInt(port.handle, ioctlTcflsh, unix.TCIOFLUSH)
+	fatalIfError(err)
 }
