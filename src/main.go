@@ -2,75 +2,84 @@ package main
 
 import (
 	"bufio"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"strconv"
-	"strings"
+	"time"
 )
 
 func main() {
-	path := getArg(0)
-	speed := getArg(1)
-	config := getArg(2)
+	//erlang forwards golang stderr to its own
+	SetupLog()
+	path := getArg(1)
+	speed := getArg(2)
+	config := getArg(3)
 	bauds, err := strconv.Atoi(speed)
 	fatalIfError(err)
 	mode := &Mode{BaudRate: bauds}
 	configMode(config, mode)
 	port := Open(path, mode)
-	scanner := bufio.NewScanner(os.Stdin)
-	var resp strings.Builder
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		for i := 0; i < len(line); i++ {
-			c := line[i]
-			switch c {
-			case 'f':
-				port.Drain()
-			case 'd':
-				port.Discard()
-			case 'w':
-				nn, err := strconv.ParseUint(line[i+1:i+3], 16, 8)
+	reader := bufio.NewReader(os.Stdin)
+	writer := bufio.NewWriter(os.Stdout)
+	head := make([]byte, 2)
+	for {
+		runtime.GC()
+		n, err := reader.Read(head)
+		if err == nil && n != 2 {
+			err = fmt.Errorf("stdin read failed %d", n)
+		}
+		fatalIfError(err)
+		size := int(binary.BigEndian.Uint16(head))
+		packet := make([]byte, size)
+		n, err = reader.Read(packet)
+		if err == nil && n != size {
+			err = fmt.Errorf("stdin read failed %d", n)
+		}
+		fatalIfError(err)
+		cmd := packet[0]
+		switch cmd {
+		case 'd':
+			port.Drain()
+		case 'D':
+			port.Discard()
+		case 'w':
+			data := packet[1:]
+			n := port.Write(data)
+			if n < len(data) {
+				//write should not require to parse a response
+				//unix.write is expected to block and only
+				//write less then requested if there is
+				//a really extreme IO error (like no HD space)
+				err := fmt.Errorf("write failed %d", n)
 				fatalIfError(err)
-				data := make([]byte, nn)
-				for j := range data {
-					k := i + 3 + 2*j
-					d, err := strconv.ParseUint(line[k:k+2], 16, 8)
-					fatalIfError(err)
-					data[j] = byte(d)
-				}
-				n := port.Write(data)
-				if n < int(nn) {
-					//write should not require to parse a response
-					//unix.write is expected to block and only
-					//write less then requested if there is
-					//a really extreme IO error (like no HD space)
-					err := fmt.Errorf("write failed %d", n)
-					fatalIfError(err)
-					//and sleep (tied to the baudrate) is required
-					//for a proper retry since drain waits until
-					//all data is sent not until enough buffer
-					//is available for pending data which is
-					//inefficient
-				}
-				i += 2 + 2*int(nn)
-			case 'r':
-				nn, err := strconv.ParseUint(line[i+1:i+3], 16, 8)
-				fatalIfError(err)
-				tt, err := strconv.ParseUint(line[i+3:i+5], 16, 8)
-				fatalIfError(err)
-				port.Packet(uint8(nn), uint8(tt))
-				data := make([]byte, nn)
-				n := port.Read(data)
-				resp.Reset()
-				resp.WriteRune('r')
-				fmt.Fprintf(&resp, "%02x", n)
-				for _, d := range data[:n] {
-					fmt.Fprintf(&resp, "%02x", d)
-				}
-				fmt.Println(resp.String())
-				i += 4
+				//and sleep (tied to the baudrate) is required
+				//for a proper retry since drain waits until
+				//all data is sent not until enough buffer
+				//is available for pending data which is
+				//inefficient
 			}
+		case 'r':
+			vmin := packet[1]
+			vtime := packet[2] //tenths of a second
+			port.Packet(uint8(vmin), uint8(vtime))
+			data := make([]byte, vmin)
+			read := port.Read(data)
+			binary.BigEndian.PutUint16(head, uint16(read))
+			n, err = writer.Write(head)
+			if err == nil && n != 2 {
+				err = fmt.Errorf("stdout write failed %d", n)
+			}
+			fatalIfError(err)
+			n, err = writer.Write(data[:read])
+			if err == nil && n != read {
+				err = fmt.Errorf("stdout write failed %d", read)
+			}
+			fatalIfError(err)
+			err = writer.Flush()
+			fatalIfError(err)
 		}
 	}
 }
@@ -135,4 +144,22 @@ func configMode(config string, mode *Mode) {
 		err := fmt.Errorf("invalid config %s", config)
 		fatalIfError(err)
 	}
+}
+
+type logWriter struct {
+	pid int
+}
+
+func (w logWriter) Write(bytes []byte) (int, error) {
+	ts := time.Now().Format("20060102T150405.000")
+	line := fmt.Sprintf("%s %d %s", ts, w.pid, string(bytes))
+	return fmt.Fprint(os.Stderr, line)
+}
+
+func SetupLog() {
+	os.Setenv("GOTRACEBACK", "all")
+	w := &logWriter{}
+	w.pid = os.Getpid()
+	log.SetFlags(0)
+	log.SetOutput(w)
 }

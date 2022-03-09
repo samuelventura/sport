@@ -3,11 +3,11 @@ SRCDIR	 = src
 PRVDIR	 = priv
 
 ifeq ($(UNAME),Linux)
-TARGET = $(PRVDIR)/sniff_linux
+TARGET = $(PRVDIR)/sport_linux
 endif
 
 ifeq ($(UNAME),Darwin)
-TARGET = $(PRVDIR)/sniff_darwin
+TARGET = $(PRVDIR)/sport_darwin
 endif
 
 SOURCES = ${SRCDIR}/*.go

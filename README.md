@@ -51,6 +51,7 @@ VMIN (and in general PC timers) is totally unappropiated and unreliable to imple
 ## References
 
 - https://www.cmrr.umn.edu/~strupp/serial.html
+- http://unixwiz.net/techtips/termios-vmin-vtime.html
 - https://github.com/pkg/term/blob/master/termios/termios_linux.go
 
 ## Research
