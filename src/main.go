@@ -11,9 +11,10 @@ import (
 	"time"
 )
 
+//erlang forwards golang stderr to its own
+//which is very convenient for debuging port code
 func main() {
-	//erlang forwards golang stderr to its own
-	SetupLog()
+	setupLog()
 	path := getArg(1)
 	speed := getArg(2)
 	config := getArg(3)
@@ -51,16 +52,17 @@ func main() {
 			sync := packet[1]
 			port.Drain()
 			if sync > 0 {
-				send(writer, packet)
+				send(writer, packet[:1])
 			}
 		case 'D':
 			sync := packet[1]
 			port.Discard()
 			if sync > 0 {
-				send(writer, packet)
+				send(writer, packet[:1])
 			}
 		case 'w':
-			data := packet[1:]
+			sync := packet[1]
+			data := packet[2:]
 			n := port.Write(data)
 			if n < len(data) {
 				//write should not require to parse a response
@@ -74,6 +76,9 @@ func main() {
 				//all data is sent not until enough buffer
 				//is available for pending data which is
 				//inefficient
+			}
+			if sync > 0 {
+				send(writer, packet[:1])
 			}
 		case 'r':
 			vmin := packet[1]
@@ -182,7 +187,7 @@ func (w logWriter) Write(bytes []byte) (int, error) {
 	return fmt.Fprint(os.Stderr, line)
 }
 
-func SetupLog() {
+func setupLog() {
 	os.Setenv("GOTRACEBACK", "all")
 	w := &logWriter{}
 	w.pid = os.Getpid()

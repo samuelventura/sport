@@ -27,7 +27,7 @@ defmodule Sport do
         true = Port.command(port, ["d\x01"])
 
         receive do
-          {^port, {:data, "d\x01"}} -> true
+          {^port, {:data, "d"}} -> true
         end
     end
   end
@@ -41,13 +41,23 @@ defmodule Sport do
         true = Port.command(port, ["D\x01"])
 
         receive do
-          {^port, {:data, "D\x01"}} -> true
+          {^port, {:data, "D"}} -> true
         end
     end
   end
 
-  def write(port, data) do
-    Port.command(port, ['w', data])
+  def write(port, data, sync \\ false) do
+    case sync do
+      false ->
+        Port.command(port, ['w', 0, data])
+
+      true ->
+        true = Port.command(port, ['w', 1, data])
+
+        receive do
+          {^port, {:data, "w"}} -> true
+        end
+    end
   end
 
   # tenths of a second
