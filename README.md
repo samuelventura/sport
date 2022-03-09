@@ -2,16 +2,6 @@
 
 Serial port elixir port with a very focused async API.
 
-## Text API
-
-NN, DD, and TT are hexadecimal.
-
-- `d` discard both input and output buffers
-- `f` wait output buffer is empty
-- `wNNDD..DD` write n bytes of data
-- `rNNTT` read n bytes with timeout (0.1s granularity)
-- `p{JSON}` run async packetizer profile
-
 ## Goals and Scope
 
 - Very focused async API
@@ -46,7 +36,7 @@ VMIN (and in general PC timers) is totally unappropiated and unreliable to imple
 - Needed abstractions are easier to implement in golang
 - Cross compiles to any mayor and most embedded platforms
 - Port requires simplified error handling
-- Golang is fast enough
+- Golang is lean and fast enough
 
 ## References
 
