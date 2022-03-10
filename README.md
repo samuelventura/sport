@@ -66,3 +66,4 @@ VMIN (and in general PC timers) is totally unappropiated and unreliable to imple
 - Impact of runtime.GC()
 - Darwin support without cgo
 - Detect usb adapter removal
+- Drain without settings change
