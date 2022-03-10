@@ -9,8 +9,8 @@ defmodule Sport do
   def open(device, speed, config) do
     exec =
       case :os.type() do
-        {:unix, :darwin} -> :code.priv_dir(:sport) ++ '/sport_darwin'
-        {:unix, :linux} -> :code.priv_dir(:sport) ++ '/sport_linux'
+        {:unix, :darwin} -> :code.priv_dir(:sport) ++ '/sport'
+        {:unix, :linux} -> :code.priv_dir(:sport) ++ '/sport'
       end
 
     args = [device, to_string(speed), config]
