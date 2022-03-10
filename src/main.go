@@ -220,6 +220,10 @@ func configMode(config string, mode *Mode) {
 		mode.DataBits = 7
 		mode.Parity = EvenParity
 		mode.StopBits = OneStopBit
+	case "7N1":
+		mode.DataBits = 7
+		mode.Parity = NoParity
+		mode.StopBits = OneStopBit
 	case "7O1":
 		mode.DataBits = 7
 		mode.Parity = OddParity
@@ -235,6 +239,10 @@ func configMode(config string, mode *Mode) {
 	case "8O2":
 		mode.DataBits = 8
 		mode.Parity = OddParity
+		mode.StopBits = TwoStopBits
+	case "7N2":
+		mode.DataBits = 7
+		mode.Parity = NoParity
 		mode.StopBits = TwoStopBits
 	case "7E2":
 		mode.DataBits = 7

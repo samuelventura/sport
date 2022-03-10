@@ -127,4 +127,24 @@ defmodule SportTest do
     assert true == Sport.close(port0)
     assert true == Sport.close(port1)
   end
+
+  test "open config test" do
+    for config <- ["8N1", "8E1", "8O1", "7N1", "7E1", "7O1"] do
+      port0 = Sport.open("/tmp/tty.socat0", 9600, config)
+      port1 = Sport.open("/tmp/tty.socat1", 9600, config)
+      assert true == Sport.write(port0, "hello")
+      assert "hello" == Sport.read(port1, 5)
+      assert true == Sport.close(port0)
+      assert true == Sport.close(port1)
+    end
+
+    for config <- ["8N2", "8E2", "8O2", "7N2", "7E2", "7O2"] do
+      port0 = Sport.open("/tmp/tty.socat0", 9600, config)
+      port1 = Sport.open("/tmp/tty.socat1", 9600, config)
+      assert true == Sport.write(port0, "hello")
+      assert "hello" == Sport.read(port1, 5)
+      assert true == Sport.close(port0)
+      assert true == Sport.close(port1)
+    end
+  end
 end
