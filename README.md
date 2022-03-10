@@ -8,7 +8,7 @@ Serial elixir port with a very focused async API.
 port = Sport.open "/dev/ttyUSB0", 9600, "8N1"
 true = Sport.write port, "hello\n"
 true = Sport.drain port
-Sport.read port, 6, 4
+Sport.read port, 6, 400
 true = Sport.packetc port, 0x0A
 true = Sport.write port, "hello\n"
 "hello\n" = Sport.receive port, 400
