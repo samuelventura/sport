@@ -28,6 +28,7 @@ defmodule Sport do
         true = Port.command(port, ["d\x01"])
 
         receive do
+          {^port, {:exit_status, status}} -> {:exit, status}
           {^port, {:data, "d"}} -> true
         end
     end
@@ -42,6 +43,7 @@ defmodule Sport do
         true = Port.command(port, ["D\x01"])
 
         receive do
+          {^port, {:exit_status, status}} -> {:exit, status}
           {^port, {:data, "D"}} -> true
         end
     end
@@ -56,6 +58,7 @@ defmodule Sport do
         true = Port.command(port, ['w', 1, data])
 
         receive do
+          {^port, {:exit_status, status}} -> {:exit, status}
           {^port, {:data, "w"}} -> true
         end
     end
@@ -66,13 +69,27 @@ defmodule Sport do
     true = Port.command(port, ['r', div(size, 256), rem(size, 256), vtime])
 
     receive do
+      {^port, {:exit_status, status}} -> {:exit, status}
       {^port, {:data, <<"r", data::binary>>}} -> data
     end
   end
 
-  def receive(port) do
-    receive do
-      {^port, {:data, <<"r", data::binary>>}} -> data
+  def receive(port, timeout \\ -1) do
+    cond do
+      timeout < 0 ->
+        receive do
+          {^port, {:exit_status, status}} -> {:exit, status}
+          {^port, {:data, <<"r", data::binary>>}} -> data
+        end
+
+      true ->
+        receive do
+          {^port, {:exit_status, status}} -> {:exit, status}
+          {^port, {:data, <<"r", data::binary>>}} -> data
+        after
+          timeout ->
+            :timeout
+        end
     end
   end
 

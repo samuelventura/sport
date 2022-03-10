@@ -1,6 +1,7 @@
 package main
 
 type Port interface {
+	FD() int
 	Read(p []byte) int
 	Write(p []byte) int
 	Packet(vmin, vtime uint8)

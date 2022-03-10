@@ -128,6 +128,10 @@ func Open(portName string, mode *Mode) (port *portDto) {
 	return
 }
 
+func (port *portDto) FD() int {
+	return port.handle
+}
+
 func (port *portDto) Packet(vmin, vtime uint8) {
 	port.settings.Cc[unix.VMIN] = vmin
 	port.settings.Cc[unix.VTIME] = vtime

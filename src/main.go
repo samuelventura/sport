@@ -5,11 +5,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"runtime"
 	"strconv"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 //erlang forwards golang stderr to its own
@@ -24,6 +27,9 @@ func main() {
 	mode := &Mode{BaudRate: bauds}
 	configMode(config, mode)
 	port := Open(path, mode)
+	go func() {
+		poll_close(port)
+	}()
 	queue := make(chan []byte)
 	go func() {
 		reader := bufio.NewReader(os.Stdin)
@@ -31,6 +37,9 @@ func main() {
 		for {
 			runtime.GC()
 			n, err := reader.Read(head)
+			if err == io.EOF {
+				os.Exit(1)
+			}
 			if err == nil && n != 2 {
 				err = fmt.Errorf("stdin read failed %d", n)
 			}
@@ -38,6 +47,9 @@ func main() {
 			size := int(binary.BigEndian.Uint16(head))
 			packet := make([]byte, size)
 			n, err = reader.Read(packet)
+			if err == io.EOF {
+				os.Exit(1)
+			}
 			if err == nil && n != size {
 				err = fmt.Errorf("stdin read failed %d", n)
 			}
@@ -110,6 +122,17 @@ func main() {
 			}
 		}
 	}
+}
+
+func poll_close(port Port) {
+	fd := unix.PollFd{
+		Fd:     int32(port.FD()),
+		Events: unix.POLLHUP,
+	}
+	fds := []unix.PollFd{fd}
+	_, err := unix.Poll(fds, -1)
+	fatalIfError(err)
+	os.Exit(2)
 }
 
 func read_c(port Port, writer *bufio.Writer, c byte) {

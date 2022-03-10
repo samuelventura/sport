@@ -2,6 +2,20 @@
 
 Serial elixir port with a very focused async API.
 
+## Usage
+
+```elixir
+port = Sport.open "/dev/ttyUSB0", 9600, "8N1"
+true = Sport.write port, "hello\n"
+true = Sport.drain port
+Sport.read port, 6, 4
+true = Sport.packetc port, 0x0A
+true = Sport.write port, "hello\n"
+"hello\n" = Sport.receive port, 400
+true = Sport.close port
+flush()
+```
+
 ## Goals and Scope
 
 - Very focused async API
