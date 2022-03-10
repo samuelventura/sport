@@ -45,7 +45,7 @@ defmodule SportTest do
     assert true == Sport.drain(port1)
     # sporadic avail=0
     :timer.sleep(100)
-    assert all == Sport.read(port0, 0, 1)
+    assert all == Sport.read(port0, 0, 100)
     assert true == Sport.close(port0)
     assert true == Sport.close(port1)
   end

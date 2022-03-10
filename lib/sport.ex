@@ -3,6 +3,9 @@ defmodule Sport do
   defguard is_byte(n) when is_integer(n) and n >= 0 and n <= 0xFF
   defguard is_word(n) when is_integer(n) and n >= 0 and n <= 0xFFFF
 
+  defguard is_hundred(n)
+           when is_integer(n) and n >= 0 and rem(n, 100) == 0 and div(n, 100) <= 0xFF
+
   def open(device, speed, config) do
     exec =
       case :os.type() do
@@ -64,9 +67,8 @@ defmodule Sport do
     end
   end
 
-  # tenths of a second
-  def read(port, size \\ 0, vtime \\ 0) when is_word(size) and is_byte(vtime) do
-    true = Port.command(port, ['r', div(size, 256), rem(size, 256), vtime])
+  def read(port, size \\ 0, timeout \\ 0) when is_word(size) and is_hundred(timeout) do
+    true = Port.command(port, ['r', div(size, 256), rem(size, 256), div(timeout, 100)])
 
     receive do
       {^port, {:exit_status, status}} -> {:exit, status}
